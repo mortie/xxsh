@@ -6,6 +6,10 @@
 #include <unistd.h>
 #include <errno.h>
 
+#ifndef XXSH_VERSION
+#define XXSH_VERSION "version unknown"
+#endif
+
 #define commands \
 	X(ls, "List files in a directory") \
 	X(pwd, "Print the current working directory") \
@@ -171,12 +175,15 @@ static int run(char *line) {
 }
 
 int main() {
+	printf("XXSH %s\n", XXSH_VERSION);
+	int ret = 0;
 	char line[4096];
 	while (running) {
 		printf(">> ");
 		if (fgets(line, sizeof(line), stdin) == NULL) {
 			perror("stdin");
-			return 1;
+			ret = 1;
+			break;
 		}
 
 		int ret;
@@ -186,5 +193,6 @@ int main() {
 		}
 	}
 
-	return 0;
+	printf("Exit.\n");
+	return ret;
 }
