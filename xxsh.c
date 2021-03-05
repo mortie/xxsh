@@ -2,8 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <grp.h>
+#include <pwd.h>
 #include <errno.h>
 
 #ifndef XXSH_VERSION
@@ -12,6 +15,7 @@
 
 #define commands \
 	X(ls, "List files in a directory") \
+	X(stat, "Get info about a file") \
 	X(pwd, "Print the current working directory") \
 	X(cat, "See the content of files") \
 	X(cd, "Change directory") \
@@ -20,10 +24,10 @@
 
 static int running = 1;
 
-static void readarg(char **line, char **arg) {
+static int readarg(char **line, char **arg) {
 	if (**line == '\0') {
 		*arg = *line;
-		return;
+		return 0;
 	}
 
 	while (**line == ' ' || **line == '\t') *line += 1;
@@ -34,6 +38,8 @@ static void readarg(char **line, char **arg) {
 		**line = '\0';
 		*line += 1;
 	}
+
+	return **arg != '\0';
 }
 
 static int ls_path(char *path) {
@@ -83,6 +89,37 @@ static int do_ls(char **line) {
 	return 0;
 }
 
+static int do_stat(char **line) {
+	char *arg;
+	while (readarg(line, &arg)) {
+		struct stat st;
+		if (stat(arg, &st) < 0) {
+			perror(arg);
+			return -1;
+		}
+
+		char uname[1024];
+		struct passwd *pw;
+		if ((pw = getpwuid(st.st_uid)) == NULL) {
+			snprintf(uname, sizeof(uname), "%i", st.st_uid);
+		} else {
+			strncpy(uname, pw->pw_name, sizeof(uname));
+		}
+
+		char gname[1024];
+		struct group *gr;
+		if ((gr = getgrgid(st.st_gid)) == NULL) {
+			snprintf(gname, sizeof(gname), "%i", st.st_gid);
+		} else {
+			strncpy(gname, gr->gr_name, sizeof(gname));
+		}
+
+		printf("%s: %o: %s:%s\n", arg, st.st_mode, uname, gname);
+	}
+
+	return 0;
+}
+
 static int do_pwd(char **line) {
 	char path[4096];
 	errno = 0;
@@ -124,24 +161,21 @@ static int do_cat(char **line) {
 		if (fclose(f) < 0) {
 			perror("fclose");
 		}
-
-		readarg(line, &arg);
-	} while (*arg != '\0');
+	} while (readarg(line, &arg));
 
 	return 0;
 }
 
 static int do_cd(char **line) {
 	char *arg;
-	readarg(line, &arg);
-	if (*arg == '\0') {
-		if (chdir("/") < 0) {
-			perror("/");
+	if (readarg(line, &arg)) {
+		if (chdir(arg) < 0) {
+			perror(arg);
 			return -1;
 		}
 	} else {
-		if (chdir(arg) < 0) {
-			perror(arg);
+		if (chdir("/") < 0) {
+			perror("/");
 			return -1;
 		}
 	}
@@ -164,7 +198,9 @@ static int do_exit(char **line) {
 
 static int run(char *line) {
 	char *command;
-	readarg(&line, &command);
+	if (!readarg(&line, &command)) {
+		return 0;
+	}
 
 #define X(name, desc) if (strcmp(command, #name) == 0) return do_ ## name(&line);
 	commands
