@@ -1,7 +1,16 @@
 VERSION := 0.1
 XXSH_VERSION := "\"$(VERSION) $(shell git rev-parse --short HEAD)\""
 
-CFLAGS += -Ilinenoise -Wall -Wextra -Wno-unused-parameter -Wpedantic -DXXSH_VERSION=$(XXSH_VERSION)
+STATIC ?= 1
+
+CFLAGS += \
+	-Ilinenoise -DXXSH_VERSION=$(XXSH_VERSION) \
+	-Wall -Wextra -Wno-unused-parameter -Wpedantic
+
+ifeq ($(STATIC),1)
+	LDFLAGS += -static
+endif
+
 xxsh: xxsh.c linenoise/linenoise.c
 
 .PHONY: clean
