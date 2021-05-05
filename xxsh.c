@@ -19,18 +19,18 @@
 #endif
 
 #define commands \
-	X(echo, "Echo text") \
-	X(ls, "List files in a directory") \
-	X(stat, "Get info about a file") \
-	X(pwd, "Print the current working directory") \
-	X(cat, "See the content of files") \
-	X(cd, "Change directory") \
-	X(rm, "Remove files") \
+	X(echo, " Echo text") \
+	X(ls, "   List files in a directory") \
+	X(stat, " Get info about a file") \
+	X(pwd, "  Print the current working directory") \
+	X(cat, "  See the content of files") \
+	X(cd, "   Change directory") \
+	X(rm, "   Remove files") \
 	X(rmdir, "Remove a directory") \
 	X(mkdir, "Make a directory") \
 	X(mount, "Mount a filesystem") \
-	X(help, "Show this help text") \
-	X(exit, "Exit XXSH")
+	X(help, " Show this help text") \
+	X(exit, " Exit XXSH")
 
 static int running = 1;
 static FILE *outf;
