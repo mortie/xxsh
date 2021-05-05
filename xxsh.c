@@ -4,6 +4,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
+#include <sys/wait.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <grp.h>
@@ -304,6 +305,49 @@ static int do_exit(char **line) {
 	return 0;
 }
 
+static int do_exec(char *argv0, char **line) {
+	pid_t pid = fork();
+	if (pid == 0) {
+		char *argv[1024];
+		argv[0] = argv0;
+		size_t i;
+		for (i = 1; i < sizeof(argv) / sizeof(*argv) - 1; ++i) {
+			argv[i] = readarg(line);
+			if (argv[i] == NULL) {
+				break;
+			}
+		}
+
+		argv[i] = NULL;
+
+		if (outf != stdout) {
+			if (dup2(fileno(outf), fileno(stdout)) < 0) {
+				perror("dup2");
+				exit(1);
+			}
+		}
+
+		if (execvp(argv0, argv) < 0) {
+			perror(argv0);
+			exit(1);
+		}
+
+		abort(); // We should never get here
+	}
+
+	int wstatus;
+	if (waitpid(pid, &wstatus, 0) < 0) {
+		perror("waitpid");
+		return -1;
+	}
+
+	if (WIFEXITED(wstatus)) {
+		return -WEXITSTATUS(wstatus);
+	} else {
+		return -128 - WTERMSIG(wstatus);
+	}
+}
+
 static int run(char *line) {
 	char redirpath[1024];
 	int redirect = 0;
@@ -370,8 +414,8 @@ static int run(char *line) {
 	commands
 #undef X
 
-	fprintf(stderr, "Unknown command '%s'\n", command);
-	retval = -1;
+	// Fall back to exec'ing a path
+	retval = do_exec(command, &line);
 	goto exit;
 
 exit:
