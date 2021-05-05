@@ -3,6 +3,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/mount.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <grp.h>
@@ -16,7 +17,6 @@
 #define XXSH_VERSION "version unknown"
 #endif
 
-// TODO: rm, rmdir, mkdir, execute file
 #define commands \
 	X(echo, "Echo text") \
 	X(ls, "List files in a directory") \
@@ -24,6 +24,10 @@
 	X(pwd, "Print the current working directory") \
 	X(cat, "See the content of files") \
 	X(cd, "Change directory") \
+	X(rm, "Remove files") \
+	X(rmdir, "Remove a directory") \
+	X(mkdir, "Make a directory") \
+	X(mount, "Mount a filesystem") \
 	X(help, "Show this help text") \
 	X(exit, "Exit XXSH")
 
@@ -39,28 +43,33 @@ static void readstr(char *line, size_t *start, size_t *end) {
 	*end = line - s;
 }
 
-static int readarg(char **line, char **arg) {
+static char *readarg(char **line) {
+	char *arg;
 	if (**line == '\0') {
-		*arg = *line;
-		return 0;
+		arg = *line;
+		return NULL;
 	}
 
 	size_t start, end;
 	readstr(*line, &start, &end);
-	*arg = *line + start;
+	arg = *line + start;
 	*line += end;
 	if (**line != '\0') {
 		**line = '\0';
 		*line += 1;
 	}
 
-	return **arg != '\0';
+	if (*arg == '\0') {
+		return NULL;
+	} else {
+		return arg;
+	}
 }
 
 static int do_echo(char **line) {
 	char *arg;
 	int first = 1;
-	while (readarg(line, &arg)) {
+	while ((arg = readarg(line))) {
 		if (first) {
 			fprintf(outf, "%s", arg);
 			first = 0;
@@ -103,15 +112,13 @@ static int ls_path(char *path) {
 }
 
 static int do_ls(char **line) {
-	char *arg;
-	readarg(line, &arg);
-	if (*arg == '\0') {
+	char *arg = readarg(line);
+	if (!arg) {
 		return ls_path(".");
 	}
 
-	char *arg2;
-	readarg(line, &arg2);
-	if (*arg2 == '\0') {
+	char *arg2 = readarg(line);
+	if (!arg2) {
 		return ls_path(arg);
 	}
 
@@ -127,15 +134,15 @@ static int do_ls(char **line) {
 			return ret;
 		}
 
-		readarg(line, &arg2);
-	} while (*arg2 != '\0');
+		arg2 = readarg(line);
+	} while (arg2);
 
 	return 0;
 }
 
 static int do_stat(char **line) {
 	char *arg;
-	while (readarg(line, &arg)) {
+	while ((arg = readarg(line))) {
 		struct stat st;
 		if (stat(arg, &st) < 0) {
 			perror(arg);
@@ -177,9 +184,8 @@ static int do_pwd(char **line) {
 }
 
 static int do_cat(char **line) {
-	char *arg;
-	readarg(line, &arg);
-	if (*arg == '\0') {
+	char *arg = readarg(line);
+	if (!arg) {
 		return 0;
 	}
 
@@ -205,14 +211,14 @@ static int do_cat(char **line) {
 		if (fclose(f) < 0) {
 			perror("fclose");
 		}
-	} while (readarg(line, &arg));
+	} while ((arg = readarg(line)));
 
 	return 0;
 }
 
 static int do_cd(char **line) {
-	char *arg;
-	if (readarg(line, &arg)) {
+	char *arg = readarg(line);
+	if (arg) {
 		if (chdir(arg) < 0) {
 			perror(arg);
 			return -1;
@@ -222,6 +228,64 @@ static int do_cd(char **line) {
 			perror("/");
 			return -1;
 		}
+	}
+
+	return 0;
+}
+
+static int do_rm(char **line) {
+	int ret = 0;
+	char *arg;
+	while ((arg = readarg(line))) {
+		if (unlink(arg) < 0) {
+			perror(arg);
+			ret = -1;
+		}
+	}
+
+	return ret;
+}
+
+static int do_rmdir(char **line) {
+	int ret = 0;
+	char *arg;
+	while ((arg = readarg(line))) {
+		if (rmdir(arg) < 0) {
+			perror(arg);
+			ret = -1;
+		}
+	}
+
+	return ret;
+}
+
+static int do_mkdir(char **line) {
+	int ret = 0;
+	char *arg;
+	while ((arg = readarg(line))) {
+		if (mkdir(arg, 0777) < 0) {
+			perror(arg);
+			ret = -1;
+		}
+	}
+
+	return ret;
+}
+
+static int do_mount(char **line) {
+	char *source = readarg(line);
+	char *target = readarg(line);
+	char *fstype = readarg(line);
+	char *data = readarg(line);
+
+	if (source == NULL || target == NULL) {
+		fprintf(stderr, "Mount requires 2 arguments\n");
+		return -1;
+	}
+
+	if (mount(source, target, fstype, 0, data) < 0) {
+		perror("mount");
+		return -1;
 	}
 
 	return 0;
@@ -293,8 +357,8 @@ static int run(char *line) {
 		outf = redirf;
 	}
 
-	char *command;
-	if (!readarg(&line, &command)) {
+	char *command = readarg(&line);
+	if (!command) {
 		goto exit;
 	}
 
