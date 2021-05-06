@@ -10,7 +10,7 @@
 #include <grp.h>
 #include <pwd.h>
 #include <errno.h>
-#include <signal.h>
+#include <libgen.h>
 
 #include "linenoise/linenoise.h"
 
@@ -253,11 +253,11 @@ static int do_get(char **line) {
 	char *arg;
 	while ((arg = readarg(line))) {
 		char *env = getenv(arg);
-		if (env) {
+		if (!env) {
 			fprintf(stderr, "No such env var: %s\n", arg);
 			ret = -1;
 		} else {
-			fprintf(outf, "%s=%s\n", arg, env);
+			fprintf(outf, "%s\n", env);
 		}
 	}
 
@@ -344,6 +344,7 @@ static int do_mount(char **line) {
 	char *source = readarg(line);
 	char *target = readarg(line);
 	char *fstype = readarg(line);
+	char *flags = readarg(line);
 	char *data = readarg(line);
 
 	if (source == NULL || target == NULL) {
@@ -351,7 +352,80 @@ static int do_mount(char **line) {
 		return -1;
 	}
 
-	if (mount(source, target, fstype, 0, data) < 0) {
+	unsigned long mountflags = 0;
+	size_t start = 0;
+	for (size_t i = 0; ; ++i) {
+		if (flags[i] == ',' || flags[i] == '\0') {
+			flags[i] = '\0';
+			char *str = flags + start;
+
+			if (strcmp(str, "remount") == 0) {
+				mountflags |= MS_REMOUNT;
+			} else if (strcmp(str, "bind") == 0) {
+				mountflags |= MS_BIND;
+			} else if (strcmp(str, "shared") == 0) {
+				mountflags |= MS_SHARED;
+			} else if (strcmp(str, "private") == 0) {
+				mountflags |= MS_PRIVATE;
+			} else if (strcmp(str, "slave") == 0) {
+				mountflags |= MS_SLAVE;
+			} else if (strcmp(str, "unbindable") == 0) {
+				mountflags |= MS_UNBINDABLE;
+			} else if (strcmp(str, "move") == 0) {
+				mountflags |= MS_MOVE;
+#ifdef MS_DIRSYNC
+			} else if (strcmp(str, "dirsync") == 0) {
+				mountflags |= MS_DIRSYNC;
+#endif
+#ifdef MS_LAZYTIME
+			} else if (strcmp(str, "lazytime") == 0) {
+				mountflags |= MS_LAZYTIME;
+#endif
+			} else if (strcmp(str, "mandlock") == 0) {
+				mountflags |= MS_MANDLOCK;
+			} else if (strcmp(str, "noatime") == 0) {
+				mountflags |= MS_NOATIME;
+			} else if (strcmp(str, "noexec") == 0) {
+				mountflags |= MS_NOEXEC;
+			} else if (strcmp(str, "nosuid") == 0) {
+				mountflags |= MS_NOSUID;
+			} else if (strcmp(str, "rdonly") == 0) {
+				mountflags |= MS_RDONLY;
+#ifdef MS_REC
+			} else if (strcmp(str, "rec") == 0) {
+				mountflags |= MS_REC;
+#endif
+#ifdef MS_RELATIME
+			} else if (strcmp(str, "relatime") == 0) {
+				mountflags |= MS_RELATIME;
+#endif
+#ifdef MS_SILENT
+			} else if (strcmp(str, "silent") == 0) {
+				mountflags |= MS_SILENT;
+#endif
+#ifdef MS_STRICTATIME
+			} else if (strcmp(str, "strictatime") == 0) {
+				mountflags |= MS_STRICTATIME;
+#endif
+			} else if (strcmp(str, "synchronous") == 0) {
+				mountflags |= MS_SYNCHRONOUS;
+#ifdef MS_NOSYMFOLLOW
+			} else if (strcmp(str, "nosymfollow") == 0) {
+				mountflags |= MS_NOSYMFOLLOW;
+#endif
+			} else {
+				fprintf(stderr, "Unknown mount option: '%s'\n", str);
+				return -1;
+			}
+
+			if (flags[i] == '\0') {
+				break;
+			}
+			start = i + 1;
+		}
+	}
+
+	if (mount(source, target, fstype, mountflags, data) < 0) {
 		perror("mount");
 		return -1;
 	}
@@ -499,6 +573,7 @@ int main() {
 
 	fprintf(outf, "XXSH %s\n", XXSH_VERSION);
 	linenoiseHistorySetMaxLen(64);
+
 	int ret = 0;
 	while (running) {
 		errno = 0;
