@@ -93,8 +93,8 @@ static int do_echo(char **line) {
 }
 
 static int ls_path(char *path) {
-	struct dirent **names;
-	int n = scandir(path, &names, NULL, alphasort);
+	struct dirent **ents;
+	int n = scandir(path, &ents, NULL, alphasort);
 	if (n < 0) {
 		perror(path);
 		return -1;
@@ -102,22 +102,28 @@ static int ls_path(char *path) {
 
 	size_t linelen = 0;
 	for (int i = 0; i < n; ++i) {
-		size_t namelen = strlen(names[i]->d_name);
+		size_t namelen = strlen(ents[i]->d_name);
 		if (linelen != 0 && linelen + namelen > 80) {
 			fprintf(outf, "\n");
 			linelen = 0;
 		}
 
-		if (linelen == 0) {
-			fprintf(outf, "%s", names[i]->d_name);
-		} else {
-			fprintf(outf, "  %s", names[i]->d_name);
+		if (linelen != 0) {
+			fprintf(outf, "  ");
+			linelen += 2;
 		}
-		linelen += namelen + 2;
+
+		if (ents[i]->d_type == DT_DIR) {
+			fprintf(outf, "%s/", ents[i]->d_name);
+			linelen += namelen + 1;
+		} else {
+			fprintf(outf, "%s", ents[i]->d_name);
+			linelen += namelen;
+		}
 	}
 	fprintf(outf, "\n");
 
-	free(names);
+	free(ents);
 	return 0;
 }
 
