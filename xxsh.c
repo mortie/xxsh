@@ -568,11 +568,110 @@ exit:
 	return retval;
 }
 
+// I kind of hate this whole function, but it works...
+// TODO: make this less bad?
+static void completion(const char *buf, linenoiseCompletions *lc) {
+	size_t buflen = strlen(buf);
+
+	int is_empty = 1;
+	for (size_t i = 0; i < buflen; ++i) {
+		if (buf[i] != ' ') {
+			is_empty = 0;
+			break;
+		}
+	}
+
+	if (is_empty) {
+#define X(name, desc) \
+		linenoiseAddCompletion(lc, #name);
+		commands
+#undef X
+		return;
+	}
+
+	if (buf[buflen - 1] == ' ') {
+		struct dirent **names;
+		int n = scandir(".", &names, NULL, alphasort);
+		if (n < 0) {
+			return;
+		}
+
+		char buffer[1024];
+		for (int i = 0; i < n; ++i) {
+			if (names[i]->d_name[0] != '.') {
+				snprintf(buffer, sizeof(buffer), "%s./%s", buf, names[i]->d_name);
+				linenoiseAddCompletion(lc, buffer);
+			}
+		}
+
+		free(names);
+		return;
+	}
+
+	char linebuf[1024];
+	snprintf(linebuf, sizeof(linebuf), "%s", buf);
+
+	char *arg = NULL;
+	char *tmp;
+	char *line = linebuf;
+	while ((tmp = readarg(&line))) {
+		arg = tmp;
+	}
+
+	if (arg == NULL) {
+		return;
+	}
+
+	size_t arglen = strlen(arg);
+	if (arg[arglen - 1] == '/') {
+		struct dirent **names;
+		int n = scandir(arg, &names, NULL, alphasort);
+		if (n < 0) {
+			return;
+		}
+
+		char buffer[1024];
+		for (int i = 0; i < n; ++i) {
+			if (names[i]->d_name[0] != '.') {
+				snprintf(buffer, sizeof(buffer), "%s%s", buf, names[i]->d_name);
+				linenoiseAddCompletion(lc, buffer);
+			}
+		}
+
+		free(names);
+		return;
+	}
+
+	// dirname and basename modify their contents, so create a new buffer
+	// for dirname to mess up and let basename mess up the old one
+	char argbuf[1024];
+	snprintf(argbuf, sizeof(argbuf), "%s", arg);
+	char *dirpart = dirname(argbuf);
+	char *basepart = basename(arg);
+
+	struct dirent **names;
+	int n = scandir(dirpart, &names, NULL, alphasort);
+	if (n < 0) {
+		return;
+	}
+
+	char buffer[1024];
+	for (int i = 0; i < n; ++i) {
+		if (strncmp(names[i]->d_name, basepart, strlen(basepart)) == 0) {
+			snprintf(
+					buffer, sizeof(buffer), "%.*s%s",
+					(int)(buflen - strlen(basepart)), buf, names[i]->d_name);
+			linenoiseAddCompletion(lc, buffer);
+		}
+	}
+}
+
 int main() {
 	outf = stdout;
 
 	fprintf(outf, "XXSH %s\n", XXSH_VERSION);
 	linenoiseHistorySetMaxLen(64);
+	linenoiseSetCompletionCallback(completion);
 
 	int ret = 0;
 	while (running) {
