@@ -1,12 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <sys/wait.h>
+#include <sys/reboot.h>
 #include <dirent.h>
-#include <unistd.h>
 #include <grp.h>
 #include <pwd.h>
 #include <errno.h>
@@ -19,22 +20,24 @@
 #endif
 
 #define commands \
-	X(echo, " Echo text") \
-	X(ls, "   List files in a directory") \
-	X(stat, " Get info about a file") \
-	X(pwd, "  Print the current working directory") \
-	X(cat, "  See the content of files") \
-	X(cd, "   Change directory") \
-	X(env, "  List all environment variables") \
-	X(get, "  Get environment variables") \
-	X(set, "  Set environment variables") \
-	X(unset, "Unset environment variables") \
-	X(rm, "   Remove files") \
-	X(rmdir, "Remove a directory") \
-	X(mkdir, "Make a directory") \
-	X(mount, "Mount a filesystem") \
-	X(help, " Show this help text") \
-	X(exit, " Exit XXSH")
+	X(echo, "  Echo text") \
+	X(ls, "    List files in a directory") \
+	X(stat, "  Get info about a file") \
+	X(pwd, "   Print the current working directory") \
+	X(cat, "   See the content of files") \
+	X(cd, "    Change directory") \
+	X(env, "   List all environment variables") \
+	X(get, "   Get environment variables") \
+	X(set, "   Set environment variables") \
+	X(unset, " Unset environment variables") \
+	X(rm, "    Remove files") \
+	X(rmdir, " Remove a directory") \
+	X(mkdir, " Make a directory") \
+	X(mount, " Mount a filesystem") \
+	X(umount, "Unmount a mount point") \
+	X(reboot, "Reboot the system") \
+	X(help, "  Show this help text") \
+	X(exit, "  Exit XXSH")
 
 extern char **environ;
 
@@ -429,6 +432,28 @@ static int do_mount(char **line) {
 
 	if (mount(source, target, fstype, mountflags, data) < 0) {
 		perror("mount");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int do_umount(char **line) {
+	int ret = 0;
+	char *arg;
+	while ((arg = readarg(line))) {
+		if (umount(arg) < 0) {
+			perror(arg);
+			ret = -1;
+		}
+	}
+
+	return ret;
+}
+
+static int do_reboot(char **line) {
+	if (reboot(RB_AUTOBOOT) < 0) {
+		perror("reboot");
 		return -1;
 	}
 
