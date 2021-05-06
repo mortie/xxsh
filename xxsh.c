@@ -25,12 +25,18 @@
 	X(pwd, "  Print the current working directory") \
 	X(cat, "  See the content of files") \
 	X(cd, "   Change directory") \
+	X(env, "  List all environment variables") \
+	X(get, "  Get environment variables") \
+	X(set, "  Set environment variables") \
+	X(unset, "Unset environment variables") \
 	X(rm, "   Remove files") \
 	X(rmdir, "Remove a directory") \
 	X(mkdir, "Make a directory") \
 	X(mount, "Mount a filesystem") \
 	X(help, " Show this help text") \
 	X(exit, " Exit XXSH")
+
+extern char **environ;
 
 static int running = 1;
 static FILE *outf;
@@ -232,6 +238,67 @@ static int do_cd(char **line) {
 	}
 
 	return 0;
+}
+
+static int do_env(char **line) {
+	for (size_t i = 0; environ[i]; ++i) {
+		fprintf(stderr, "%s\n", environ[i]);
+	}
+
+	return 0;
+}
+
+static int do_get(char **line) {
+	int ret = 0;
+	char *arg;
+	while ((arg = readarg(line))) {
+		char *env = getenv(arg);
+		if (env) {
+			fprintf(stderr, "No such env var: %s\n", arg);
+			ret = -1;
+		} else {
+			fprintf(outf, "%s=%s\n", arg, env);
+		}
+	}
+
+	return ret;
+}
+
+static int do_set(char **line) {
+	int ret = 0;
+	while (1) {
+		char *key = readarg(line);
+		if (key == NULL) {
+			break;
+		}
+
+		char *val = readarg(line);
+		if (val == NULL) {
+			fprintf(stderr, "Key without a value: %s\n", key);
+			ret = -1;
+			break;
+		}
+
+		if (setenv(key, val, 1) < 0) {
+			fprintf(stderr, "setenv %s: %s\n", key, strerror(errno));
+			ret = -1;
+		}
+	}
+
+	return ret;
+}
+
+static int do_unset(char **line) {
+	int ret = 0;
+	char *arg;
+	while ((arg = readarg(line))) {
+		if (unsetenv(arg) < 0) {
+			fprintf(stderr, "unsetenv %s: %s\n", arg, strerror(errno));
+			ret = -1;
+		}
+	}
+
+	return ret;
 }
 
 static int do_rm(char **line) {
