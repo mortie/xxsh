@@ -7,6 +7,7 @@
 #include <sys/mount.h>
 #include <sys/wait.h>
 #include <sys/reboot.h>
+#include <sys/utsname.h>
 #include <dirent.h>
 #include <grp.h>
 #include <pwd.h>
@@ -36,6 +37,7 @@
 	X(mount, " Mount a filesystem") \
 	X(umount, "Unmount a mount point") \
 	X(reboot, "Reboot the system") \
+	X(uname, " Show system information") \
 	X(help, "  Show this help text") \
 	X(exit, "  Exit XXSH")
 
@@ -463,6 +465,18 @@ static int do_reboot(char **line) {
 		return -1;
 	}
 
+	return 0;
+}
+
+static int do_uname(char **name) {
+	struct utsname uts;
+	if (uname(&uts) < 0) {
+		perror("uname");
+		return -1;
+	}
+
+	fprintf(outf, "%s %s %s %s %s\n",
+			uts.sysname, uts.nodename, uts.release, uts.version, uts.machine);
 	return 0;
 }
 
