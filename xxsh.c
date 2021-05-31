@@ -13,6 +13,7 @@
 #include <pwd.h>
 #include <errno.h>
 #include <libgen.h>
+#include <zlib.h>
 
 #include "linenoise/linenoise.h"
 
@@ -26,6 +27,7 @@
 	X(stat, "  Get info about a file") \
 	X(pwd, "   Print the current working directory") \
 	X(cat, "   See the content of files") \
+	X(zcat, "  See the content of gzipped files") \
 	X(cd, "    Change directory") \
 	X(env, "   List all environment variables") \
 	X(get, "   Get environment variables") \
@@ -229,6 +231,72 @@ static int do_cat(char **line) {
 		if (fclose(f) < 0) {
 			perror("fclose");
 		}
+	} while ((arg = readarg(line)));
+
+	return 0;
+}
+
+static int do_zcat(char **line) {
+	char *arg = readarg(line);
+	if (!arg) {
+		return 0;
+	}
+
+	unsigned char zbuf[4096];
+	unsigned char buf[4095];
+	do {
+		FILE *f = fopen(arg, "r");
+		if (f == NULL) {
+			perror(arg);
+			return -1;
+		}
+
+		z_stream stream = {0};
+		stream.zalloc = Z_NULL;
+		stream.zfree = Z_NULL;
+		stream.opaque = Z_NULL;
+		stream.next_in = zbuf;
+		stream.avail_in = 0;
+		if (inflateInit2(&stream, 15 | 32) < 0) {
+			fclose(f);
+			fprintf(stderr, "%s: inflateInit2 error\n", arg);
+			return -1;
+		}
+
+		while (1) {
+			int n = fread(zbuf, 1, sizeof(zbuf), f);
+			if (n < 0) {
+				perror(arg);
+				fclose(f);
+				inflateEnd(&stream);
+				return -1;
+			} else if (n == 0) {
+				fclose(f);
+				inflateEnd(&stream);
+				break;
+			}
+
+			stream.next_in = zbuf;
+			stream.avail_in = n;
+
+			do {
+				stream.avail_out = sizeof(buf);
+				stream.next_out = buf;
+				int status = inflate(&stream, Z_NO_FLUSH);
+
+				if (status == Z_BUF_ERROR) {
+					fprintf(stderr, "%s: Inflate error: %i\n", arg, status);
+					inflateEnd(&stream);
+					fclose(f);
+					return -1;
+					break;
+				}
+
+				fwrite(buf, 1, sizeof(buf) - stream.avail_out, outf);
+			} while (stream.avail_out == 0);
+		}
+
+		inflateEnd(&stream);
 	} while ((arg = readarg(line)));
 
 	return 0;

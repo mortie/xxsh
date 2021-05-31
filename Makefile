@@ -7,6 +7,8 @@ CFLAGS += \
 	-Ilinenoise -DXXSH_VERSION=$(XXSH_VERSION) \
 	-Wall -Wextra -Wno-unused-parameter -Wpedantic
 
+LDLIBS += -lz
+
 ifeq ($(STATIC),1)
 	LDFLAGS += -static
 endif
