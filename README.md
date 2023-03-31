@@ -26,23 +26,28 @@ To cross compile, overwrite the `CC` variable. For example,
 
 The built-in commands are:
 
-* `echo <strings...>`: Print space-separated strings to the screen
-* `ls [paths...]`: List the contents of directories
-* `stat [paths...]`: Show file status (permissions and owners)
-* `pwd`: Print the current working directory
-* `cat [paths...]`: Print the contents of files
-* `cd <path>`: Change working directory
-* `env`: Print environment variables
-* `get <names...>`: Print the content of environment variables
-* `set <<name> <value>...>`: Set environment variables
-* `unset <names...>`: Unset environment variables
-* `rm <paths...>`: Delete files
-* `rmdir <paths...>`: Delete directories
-* `mkdir <paths...>`: Make directories
-* `mount <source> <target> [type] [flags] [data]`: Mount a filesystem.
+* `echo <strings...>`: Print space-separated strings to the screen.
+* `ls [paths...]`: List the contents of directories.
+* `stat [paths...]`: Show file status (permissions and owners).
+* `pwd`: Print the current working directory.
+* `cat [paths...]`: Print the contents of files.
+* `zcat [paths...]`: Print the content of gzipped files.
+* `cd <path>`: Change working directory.
+* `env`: Print environment variables.
+* `get <names...>`: Print the content of environment variables.
+* `set <<name> <value>...>`: Set environment variables.
+* `unset <names...>`: Unset environment variables.
+* `rm <paths...>`: Delete files.
+* `rmdir <paths...>`: Delete directories.
+* `mkdir <paths...>`: Make directories.
+* (Linux) `mount <source> <target> [type] [flags] [data]`: Mount a filesystem.
+  'flags' is a comma-separated list of flags.
+* (macOS) `mount <target> [type] [flags] [data]`: Mount a filesystem.
   'flags' is a comma-separated list of flags.
 * `reboot`: Reboot the machine.
 * `uname`: Get system information.
+* `help`: Show help output.
+* `exit`: Exit XXSH.
 
 Anything else will be executed from the filesystem. For example,
 `/bin/ls /foo` will use the program at `/bin/ls` to list the contents of `/foo`,
