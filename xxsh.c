@@ -419,86 +419,110 @@ static int do_mkdir(char **line) {
 	return ret;
 }
 
-static int do_mount(char **line) {
-	char *source = readarg(line);
-	char *target = readarg(line);
-	char *fstype = readarg(line);
-	char *flags = readarg(line);
-	char *data = readarg(line);
+struct mount_flag {
+	const char *name;
+	unsigned long value;
+};
 
-	if (source == NULL || target == NULL) {
-		fprintf(stderr, "Mount requires 2 arguments\n");
+struct mount_flag available_mount_flags[] = {
+#if defined(__linux__)
+	{"remount", MS_REMOUNT},
+	{"bind", MS_BIND},
+	{"shared", MS_SHARED},
+	{"private", MS_PRIVATE},
+	{"slave", MS_SLAVE},
+	{"unbindable", MS_UNBINDABLE},
+	{"move", MS_MOVE},
+# ifdef MS_DIRSYNC
+	{"dirsync", MS_DIRSYNC},
+# endif
+# ifdef MS_LAZYTIME
+	{"lazytime", MS_LAZYTIME},
+# endif
+	{"mandlock", MS_MANDLOCK},
+	{"noatime", MS_NOATIME},
+	{"noexec", MS_NOEXEC},
+	{"nosuid", MS_NOSUID},
+	{"rdonly", MS_RDONLY},
+# ifdef MS_REC
+	{"rec", MS_REC},
+# endif
+# ifdef MS_RELATIME
+	{"relatime", MS_RELATIME},
+# endif
+# ifdef MS_SILENT
+	{"silent", MS_SILENT},
+# endif
+# if MS_STRICTATIME
+	{"strictatime", MS_STRICTATIME},
+# endif
+	{"synchronous", MS_SYNCHRONOUS},
+# ifdef MS_NOSYMFOLLOW
+	{"nosymfollow", MS_NOSYMFOLLOW},
+# endif
+
+#elif defined(__APPLE__)
+	{"rdonly", MNT_RDONLY},
+	{"noexec", MNT_NOEXEC},
+	{"nosuid", MNT_NOSUID},
+	{"nodev", MNT_NODEV},
+	{"union", MNT_UNION},
+	{"synchronous", MNT_SYNCHRONOUS},
+	{"cprotect", MNT_CPROTECT},
+#endif
+
+	{NULL, 0},
+};
+
+static int do_mount(char **line) {
+#if defined(__linux__)
+	char *arg_source = readarg(line);
+	char *arg_target = readarg(line);
+	char *arg_fstype = readarg(line);
+	char *arg_flags = readarg(line);
+
+	if (arg_source == NULL || arg_target == NULL) {
+		fprintf(stderr, "Usage: mount <source> <target> [type] [flags]");
 		return -1;
 	}
+#elif defined(__APPLE__)
+	char *arg_target = readarg(line);
+	char *arg_fstype = readarg(line);
+	char *arg_flags = readarg(line);
+
+	if (!arg_target) {
+		fprintf(stderr, "Usage: mount <target> [type] [flags]");
+		return -1;
+	}
+#else
+	fprintf(stderr, "mount is not supported on your platform.\n");
+	return -1;
+#endif
 
 	unsigned long mountflags = 0;
 	size_t start = 0;
-	if (flags) {
+	if (arg_flags) {
 		for (size_t i = 0; ; ++i) {
-			if (flags[i] == ',' || flags[i] == '\0') {
-				flags[i] = '\0';
-				char *str = flags + start;
+			if (arg_flags[i] == ',' || arg_flags[i] == '\0') {
+				arg_flags[i] = '\0';
+				char *str = arg_flags + start;
 
-				if (strcmp(str, "remount") == 0) {
-					mountflags |= MS_REMOUNT;
-				} else if (strcmp(str, "bind") == 0) {
-					mountflags |= MS_BIND;
-				} else if (strcmp(str, "shared") == 0) {
-					mountflags |= MS_SHARED;
-				} else if (strcmp(str, "private") == 0) {
-					mountflags |= MS_PRIVATE;
-				} else if (strcmp(str, "slave") == 0) {
-					mountflags |= MS_SLAVE;
-				} else if (strcmp(str, "unbindable") == 0) {
-					mountflags |= MS_UNBINDABLE;
-				} else if (strcmp(str, "move") == 0) {
-					mountflags |= MS_MOVE;
-#ifdef MS_DIRSYNC
-				} else if (strcmp(str, "dirsync") == 0) {
-					mountflags |= MS_DIRSYNC;
-#endif
-#ifdef MS_LAZYTIME
-				} else if (strcmp(str, "lazytime") == 0) {
-					mountflags |= MS_LAZYTIME;
-#endif
-				} else if (strcmp(str, "mandlock") == 0) {
-					mountflags |= MS_MANDLOCK;
-				} else if (strcmp(str, "noatime") == 0) {
-					mountflags |= MS_NOATIME;
-				} else if (strcmp(str, "noexec") == 0) {
-					mountflags |= MS_NOEXEC;
-				} else if (strcmp(str, "nosuid") == 0) {
-					mountflags |= MS_NOSUID;
-				} else if (strcmp(str, "rdonly") == 0) {
-					mountflags |= MS_RDONLY;
-#ifdef MS_REC
-				} else if (strcmp(str, "rec") == 0) {
-					mountflags |= MS_REC;
-#endif
-#ifdef MS_RELATIME
-				} else if (strcmp(str, "relatime") == 0) {
-					mountflags |= MS_RELATIME;
-#endif
-#ifdef MS_SILENT
-				} else if (strcmp(str, "silent") == 0) {
-					mountflags |= MS_SILENT;
-#endif
-#ifdef MS_STRICTATIME
-				} else if (strcmp(str, "strictatime") == 0) {
-					mountflags |= MS_STRICTATIME;
-#endif
-				} else if (strcmp(str, "synchronous") == 0) {
-					mountflags |= MS_SYNCHRONOUS;
-#ifdef MS_NOSYMFOLLOW
-				} else if (strcmp(str, "nosymfollow") == 0) {
-					mountflags |= MS_NOSYMFOLLOW;
-#endif
-				} else {
+				struct mount_flag *f = available_mount_flags;
+				while (f->name) {
+					if (strcmp(f->name, str) == 0) {
+						mountflags |= f->value;
+						break;
+					}
+
+					f += 1;
+				}
+
+				if (!f->name) {
 					fprintf(stderr, "Unknown mount option: '%s'\n", str);
 					return -1;
 				}
 
-				if (flags[i] == '\0') {
+				if (arg_flags[i] == '\0') {
 					break;
 				}
 				start = i + 1;
@@ -506,7 +530,12 @@ static int do_mount(char **line) {
 		}
 	}
 
-	if (mount(source, target, fstype, mountflags, data) < 0) {
+#if defined(__linux__)
+	int ret = mount(arg_source, arg_target, arg_fstype, mountflags, NULL);
+#elif defined(__APPLE__)
+	int ret = mount(arg_fstype, arg_target, mountflags, NULL);
+#endif
+	if (ret < 0) {
 		perror("mount");
 		return -1;
 	}
@@ -518,7 +547,17 @@ static int do_umount(char **line) {
 	int ret = 0;
 	char *arg;
 	while ((arg = readarg(line))) {
-		if (umount(arg) < 0) {
+#if defined(__linux__)
+		int ret = umount(arg);
+#elif defined(__APPLE__)
+		int ret = unmount(arg, 0);
+#else
+		int ret = 0;
+		fprintf(stderr, "umount is not supported on your platform.\n");
+		return -1;
+#endif
+
+		if (ret < 0) {
 			perror(arg);
 			ret = -1;
 		}
