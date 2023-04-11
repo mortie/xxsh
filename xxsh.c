@@ -13,9 +13,9 @@
 #include <pwd.h>
 #include <errno.h>
 #include <libgen.h>
-#include <zlib.h>
 
-#include "linenoise/linenoise.h"
+#include <linenoise/linenoise.h>
+#include <miniz/miniz.h>
 
 #ifndef XXSH_VERSION
 #define XXSH_VERSION "version unknown"

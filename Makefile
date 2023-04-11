@@ -4,16 +4,22 @@ XXSH_VERSION := "\"$(VERSION) $(shell git rev-parse --short HEAD)\""
 STATIC ?= 1
 
 CFLAGS += \
-	-Ilinenoise -DXXSH_VERSION=$(XXSH_VERSION) \
+	-Ithirdparty -DXXSH_VERSION=$(XXSH_VERSION) \
+	-D_LARGEFILE64_SOURCE \
 	-Wall -Wextra -Wno-unused-parameter -Wpedantic
-
-LDLIBS += -lz
 
 ifeq ($(STATIC),1)
 	LDFLAGS += -static
 endif
 
-xxsh: xxsh.c linenoise/linenoise.c
+SRCS = xxsh.c \
+	thirdparty/linenoise/linenoise.c \
+	thirdparty/miniz/miniz.c \
+	thirdparty/miniz/miniz_tdef.c \
+	thirdparty/miniz/miniz_tinfl.c \
+	thirdparty/miniz/miniz_zip.c
+
+xxsh: $(SRCS)
 
 .PHONY: clean
 clean:
