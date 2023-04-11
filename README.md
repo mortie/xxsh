@@ -22,6 +22,10 @@ build with `make STATIC=0`.
 To cross compile, overwrite the `CC` variable. For example,
 `make CC=aarch64-linux-gnu-gcc` will compile for 64-bit ARM.
 
+To make uBoot uInitrd with xxsh as the '/init' file, pass in `UINITRD_ARCH` to the uInitrd target.
+For example, `make CC=aarch64-linux-gnu-gcc UINITRD_ARCH=arm64 uInitrd` makes a uInitrd for arm64
+with an xxsh compiled using aarch64-linux-gnu-gcc.
+
 ### Commands
 
 The built-in commands are:
