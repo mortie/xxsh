@@ -29,6 +29,7 @@
 	X(cat, "   See the content of files") \
 	X(zcat, "  See the content of gzipped files") \
 	X(cd, "    Change directory") \
+	X(argv, "  Show the argv used to invoke xxsh") \
 	X(env, "   List all environment variables") \
 	X(get, "   Get environment variables") \
 	X(set, "   Set environment variables") \
@@ -47,6 +48,8 @@ extern char **environ;
 
 static int running = 1;
 static FILE *outf;
+static char **global_argv;
+static int global_argc;
 
 static void readstr(char *line, size_t *start, size_t *end) {
 	char *s = line;
@@ -314,6 +317,15 @@ static int do_cd(char **line) {
 			perror("/");
 			return -1;
 		}
+	}
+
+	return 0;
+}
+
+static int do_argv(char **line) {
+	fprintf(stderr, "argc: %d\n", global_argc);
+	for (int i = 0; i < global_argc; ++i) {
+		fprintf(stderr, "* '%s'\n", global_argv[i]);
 	}
 
 	return 0;
@@ -820,8 +832,10 @@ static void completion(const char *buf, linenoiseCompletions *lc) {
 	}
 }
 
-int main() {
+int main(int argc, char **argv) {
 	outf = stdout;
+	global_argc = argc;
+	global_argv = argv;
 
 	fprintf(outf, "XXSH %s\n", XXSH_VERSION);
 	linenoiseHistorySetMaxLen(64);
